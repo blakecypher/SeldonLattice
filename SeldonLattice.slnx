@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SeldonLattice.Domain/SeldonLattice.Domain.csproj" />
+    <Project Path="src/SeldonLattice.Infrastructure/SeldonLattice.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SeldonLattice.Domain.Tests/SeldonLattice.Domain.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NoWarn>MsgPack017</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MessagePack" Version="3.1.12" />
+    <PackageReference Include="MessagePack.Annotations" Version="3.1.12" />
+    <PackageReference Include="Microsoft.SemanticKernel.Abstractions" Version="1.81.0" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,16 @@
+bin/
+obj/
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Runtime data and keys. Never commit.
+Data/
+*.db
+*.db-shm
+*.db-wal
+*.dat
+*.mldsa.json
+pqc-keys/
