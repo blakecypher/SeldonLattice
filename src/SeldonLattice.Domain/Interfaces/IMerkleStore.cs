@@ -51,7 +51,20 @@ public interface IMerkleStore
     /// <summary>
     /// Gets all nodes of a specific type.
     /// </summary>
+    /// <remarks>
+    /// Convenience projection over <see cref="ScanBlobsAsync{T}"/>. It discards the key a
+    /// node is filed under and any payload that failed to decode, so verification must use
+    /// <see cref="ScanBlobsAsync{T}"/> instead.
+    /// </remarks>
     Task<IEnumerable<T>> GetAllNodesAsync<T>() where T : IMerkleNode;
+
+    /// <summary>
+    /// Scans the store for nodes of a specific type, returning each node together with the
+    /// content identifier it is filed under, plus the keys whose payloads could not be decoded.
+    /// </summary>
+    /// <typeparam name="T">Concrete node type to project.</typeparam>
+    /// <param name="ct">Cancellation token.</param>
+    Task<StoreScan<T>> ScanBlobsAsync<T>(CancellationToken ct = default) where T : IMerkleNode;
 
     /// <summary>
     /// Gets all stored typed objects.

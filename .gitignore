@@ -12,5 +12,13 @@ Data/
 *.db-shm
 *.db-wal
 *.dat
+*.mldsa.seed
 *.mldsa.json
 pqc-keys/
+
+# Test and tooling output.
+TestResults/
+[Dd]ebug/
+[Rr]elease/
+*.userprefs
+.DS_Store

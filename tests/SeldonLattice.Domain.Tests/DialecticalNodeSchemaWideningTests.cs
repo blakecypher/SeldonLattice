@@ -1,7 +1,6 @@
 using MessagePack;
 using SeldonLattice.Domain.Models.Storage;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace SeldonLattice.Domain.Tests;
 
@@ -41,7 +40,8 @@ public class DialecticalNodeSchemaWideningTests
         };
 
         var legacy = ToLegacyWidth(original);
-        var read = MessagePackSerializer.Deserialize<DialecticalNode>(legacy);
+        var read = MessagePackSerializer.Deserialize<DialecticalNode>(
+            legacy, cancellationToken: TestContext.Current.CancellationToken);
 
         // The content survives, so the node still loads and renders.
         Assert.Equal("weil_reply", read.NodeType);
@@ -70,7 +70,8 @@ public class DialecticalNodeSchemaWideningTests
         };
 
         var legacyBytes = ToLegacyWidth(original);
-        var read = MessagePackSerializer.Deserialize<DialecticalNode>(legacyBytes);
+        var read = MessagePackSerializer.Deserialize<DialecticalNode>(
+            legacyBytes, cancellationToken: TestContext.Current.CancellationToken);
 
         var legacyCid = Cid.Compute(legacyBytes);
         var cidAfterWidening = read.GetCid();

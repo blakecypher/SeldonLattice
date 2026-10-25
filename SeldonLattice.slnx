@@ -6,4 +6,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/SeldonLattice.Domain.Tests/SeldonLattice.Domain.Tests.csproj" />
   </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/VerificationDemo/VerificationDemo.csproj" />
+  </Folder>
 </Solution>

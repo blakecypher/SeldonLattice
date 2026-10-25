@@ -498,44 +498,152 @@ public class FasterMerkleStore : IMerkleStore, IAsyncDisposable
     /// </summary>
     /// <typeparam name="T">The node type to filter by.</typeparam>
     /// <returns>All nodes matching the requested type.</returns>
-    public Task<IEnumerable<T>> GetAllNodesAsync<T>() where T : IMerkleNode
+    /// <remarks>
+    /// This projection drops the key each node is filed under and any payload that failed to
+    /// decode. Verification uses <see cref="ScanBlobsAsync{T}"/> so those two facts survive.
+    /// </remarks>
+    public async Task<IEnumerable<T>> GetAllNodesAsync<T>() where T : IMerkleNode
     {
-        var nodes = new List<T>();
+        var scan = await ScanBlobsAsync<T>();
+        return scan.Nodes.Select(stored => stored.Node);
+    }
+
+    /// <summary>
+    /// Scans the store for nodes of a specific type, preserving the key each node is filed
+    /// under and reporting keys whose payloads could not be decoded.
+    /// </summary>
+    /// <typeparam name="T">The node type to project.</typeparam>
+    /// <param name="ct">Cancellation token.</param>
+    public Task<StoreScan<T>> ScanBlobsAsync<T>(CancellationToken ct = default) where T : IMerkleNode
+    {
+        var nodes = new List<StoredNode<T>>();
+        var unreadable = new List<string>();
+
         foreach (var kvp in _store)
         {
-            // Only object keys, skip head references
+            ct.ThrowIfCancellationRequested();
+
+            // Only object keys; skip head references, signatures, and session indexes.
             if (!kvp.Key.StartsWith("obj:", StringComparison.Ordinal))
             {
                 continue;
             }
 
-            try
+            var keyCid = Cid.FromString(kvp.Key["obj:".Length..]);
+
+            if (TryDecode<T>(kvp.Value, keyCid, out var node))
             {
-                var blob = MessagePackSerializer.Deserialize<StoredBlob>(kvp.Value);
-                if (ResolveType(blob.Type) is { } actualType && typeof(T).IsAssignableFrom(actualType))
-                {
-                    var node = MessagePackSerializer.Deserialize<T>(blob.Payload);
-                    nodes.Add(node);
-                }
-                continue;
+                // The key carries the identifier the payload was written under.
+                nodes.Add(new StoredNode<T>(keyCid, node!));
             }
-            catch
+            else if (!IsKnownOtherType<T>(kvp.Value, keyCid))
             {
-                // Legacy raw payload format fallback.
+                // Either a corrupt payload or a legacy blob that no longer parses. Both mean
+                // the content is unrecoverable, which a verifier must not treat as absent.
+                unreadable.Add(kvp.Key);
+            }
+        }
+
+        return Task.FromResult(new StoreScan<T>(nodes, unreadable));
+    }
+
+    /// <summary>
+    /// Attempts to decode a stored blob into <typeparamref name="T"/>, accepting the wrapped
+    /// format and the legacy raw payload format.
+    /// </summary>
+    private static bool TryDecode<T>(byte[] data, Cid keyCid, out T? node) where T : IMerkleNode
+    {
+        node = default;
+        try
+        {
+            var blob = MessagePackSerializer.Deserialize<StoredBlob>(data);
+            var actualType = ResolveType(blob.Type);
+            if (actualType is not null)
+            {
+                if (!typeof(T).IsAssignableFrom(actualType))
+                {
+                    return false;
+                }
+
+                node = MessagePackSerializer.Deserialize<T>(blob.Payload);
+                return node is not null;
+            }
+
+            // An unresolvable type name may just be a legacy payload that happens to look like
+            // a wrapper, so fall through rather than rejecting it here.
+        }
+        catch
+        {
+            // Fall through to the legacy raw payload format.
+        }
+
+        try
+        {
+            // Legacy format: direct serialization without the type wrapper. It carries no type
+            // tag, so accept it only when its content hashes to the key it is filed under;
+            // otherwise it is corrupt or belongs to another legacy type.
+            var candidate = MessagePackSerializer.Deserialize<T>(data);
+            if (candidate is null ||
+                !string.Equals(candidate.GetCid().ToString(), keyCid.ToString(), StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            node = candidate;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// True when the blob decodes as a known type that simply is not the type being scanned.
+    /// A payload of the requested type that fails to decode is therefore reported as unreadable
+    /// rather than mistaken for an unrelated blob.
+    /// </summary>
+    private static bool IsKnownOtherType<T>(byte[] data, Cid keyCid) where T : IMerkleNode
+    {
+        try
+        {
+            var blob = MessagePackSerializer.Deserialize<StoredBlob>(data);
+            var actualType = ResolveType(blob.Type);
+            if (actualType is not null)
+            {
+                return !typeof(T).IsAssignableFrom(actualType);
+            }
+        }
+        catch
+        {
+            // Not a wrapped blob; fall through to the legacy raw format.
+        }
+
+        // Legacy raw payloads carry no type tag, so identify them by trying the other known
+        // node types. Requiring an identifier match avoids mistaking a damaged payload of the
+        // requested type for a different type.
+        foreach (var candidate in AllowedTypes.Values)
+        {
+            if (!typeof(IMerkleNode).IsAssignableFrom(candidate) || typeof(T).IsAssignableFrom(candidate))
+            {
+                continue;
             }
 
             try
             {
-                // Legacy format: direct serialization without type wrapper
-                var node = MessagePackSerializer.Deserialize<T>(kvp.Value);
-                nodes.Add(node);
+                if (MessagePackSerializer.Deserialize(candidate, data.AsMemory()) is IMerkleNode node &&
+                    string.Equals(node.GetCid().ToString(), keyCid.ToString(), StringComparison.Ordinal))
+                {
+                    return true;
+                }
             }
             catch
             {
-                // Ignore parsing errors for non-matching types
+                // Not this type.
             }
         }
-        return Task.FromResult<IEnumerable<T>>(nodes);
+
+        return false;
     }
 
     /// <summary>

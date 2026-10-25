@@ -48,8 +48,8 @@ public class AgentSignatureTests
             Timestamp = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
         };
 
-        var bytes = MessagePackSerializer.Serialize(signature);
-        var restored = MessagePackSerializer.Deserialize<AgentSignature>(bytes);
+        var bytes = MessagePackSerializer.Serialize(signature, cancellationToken: TestContext.Current.CancellationToken);
+        var restored = MessagePackSerializer.Deserialize<AgentSignature>(bytes, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(signature.Algorithm, restored.Algorithm);
         Assert.Equal(signature.SignerId, restored.SignerId);

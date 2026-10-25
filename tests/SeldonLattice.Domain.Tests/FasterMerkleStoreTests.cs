@@ -112,7 +112,8 @@ public class FasterMerkleStoreTests
             }
 
             var dataFile = Path.Combine(tempDir, "store.dat");
-            var lineCount = (await File.ReadAllLinesAsync(dataFile)).Count(l => !string.IsNullOrWhiteSpace(l));
+            var lineCount = (await File.ReadAllLinesAsync(dataFile, TestContext.Current.CancellationToken))
+                .Count(l => !string.IsNullOrWhiteSpace(l));
 
             // Compaction keeps the on-disk file at the live-key count (1),
             // far below the 50 appends that happened.
@@ -150,7 +151,10 @@ public class FasterMerkleStoreTests
 
             // Simulate a crash mid-append: a trailing line with a truncated base64 body.
             var dataFile = Path.Combine(tempDir, "store.dat");
-            await File.AppendAllTextAsync(dataFile, $"obj:some-cid|bG9yZW0gaXBzdW0gZG9sb3I=truncated-not-valid{Environment.NewLine}");
+            await File.AppendAllTextAsync(
+                dataFile,
+                $"obj:some-cid|bG9yZW0gaXBzdW0gZG9sb3I=truncated-not-valid{Environment.NewLine}",
+                TestContext.Current.CancellationToken);
 
             var reloaded = new FasterMerkleStore(tempDir);
             var nodes = await reloaded.GetAllNodesAsync<DialecticalNode>();
